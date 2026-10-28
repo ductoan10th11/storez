@@ -1,93 +1,79 @@
-import { useEffect, useState } from 'react'
-import { api, vnd, type Cart, type Product } from './api'
+import { BrowserRouter, Link, Route, Routes } from 'react-router'
+import { AuthProvider, CartProvider, CatalogProvider } from '@/providers'
+import { StoreLayout, ScrollManager } from '@/components/StoreLayout'
+import { Button } from '@/components/ui/button'
+import { AdminLayout } from '@/admin/AdminLayout'
+import Calendar from '@/admin/Calendar'
+import Dashboard from '@/admin/Dashboard'
+import MediaLibrary from '@/admin/MediaLibrary'
+import OrderDetail from '@/admin/OrderDetail'
+import OrderPrint from '@/admin/OrderPrint'
+import Orders from '@/admin/Orders'
+import ProductForm from '@/admin/ProductForm'
+import Products from '@/admin/Products'
+import SettingsPage from '@/admin/SettingsPage'
+import Users from '@/admin/Users'
+import { AccountLayout, MyOrder, MyOrders, Profile } from '@/pages/Account'
+import { Login, Register, RequireAuth } from '@/pages/Auth'
+import Checkout from '@/pages/Checkout'
+import Home from '@/pages/Home'
+import ProductPage from '@/pages/ProductPage'
+import { TrackIndex, TrackOrder } from '@/pages/Track'
 
-const emptyCart: Cart = { items: [], total: 0, count: 0 }
+function NotFound() {
+  return (
+    <main className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
+      <h1 className="text-5xl font-extrabold tracking-tight">404</h1>
+      <p className="text-muted-foreground">Không tìm thấy trang bạn cần.</p>
+      <Button asChild variant="brand">
+        <Link to="/">Về trang chủ</Link>
+      </Button>
+    </main>
+  )
+}
 
 export default function App() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [cart, setCart] = useState<Cart>(emptyCart)
-  const [open, setOpen] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    Promise.all([api.products(), api.cart()])
-      .then(([p, c]) => {
-        setProducts(p)
-        setCart(c)
-      })
-      .catch((e) => setError(e.message))
-  }, [])
-
-  const run = (p: Promise<Cart>) => p.then(setCart).catch((e) => setError(e.message))
-
   return (
-    <>
-      <header className="topbar">
-        <h1>🛍️ Store</h1>
-        <button className="cart-btn" onClick={() => setOpen(true)} aria-label="Mở giỏ hàng">
-          🛒
-          {cart.count > 0 && <span className="badge">{cart.count}</span>}
-        </button>
-      </header>
+    <BrowserRouter>
+      <AuthProvider>
+        <CartProvider>
+          <CatalogProvider>
+            <ScrollManager />
+            <Routes>
+              <Route element={<StoreLayout />}>
+                <Route index element={<Home />} />
+                <Route path="p/:slug" element={<ProductPage />} />
+                <Route path="checkout" element={<Checkout />} />
+                <Route path="track" element={<TrackIndex />} />
+                <Route path="track/:code" element={<TrackOrder />} />
+                <Route path="login" element={<Login />} />
+                <Route path="register" element={<Register />} />
+                <Route element={<RequireAuth />}>
+                  <Route path="account" element={<AccountLayout />}>
+                    <Route index element={<Profile />} />
+                    <Route path="orders" element={<MyOrders />} />
+                    <Route path="orders/:code" element={<MyOrder />} />
+                  </Route>
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Route>
 
-      <main>
-        {error && <p className="error">Lỗi: {error}</p>}
-        <div className="grid">
-          {products.map((p) => (
-            <article className="card" key={p.id}>
-              <img src={p.image} alt={p.name} loading="lazy" />
-              <div className="card-body">
-                <h2>{p.name}</h2>
-                <p className="desc">{p.description}</p>
-                <div className="card-foot">
-                  <strong>{vnd(p.price)}</strong>
-                  <button onClick={() => run(api.add(p.id))}>Thêm</button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </main>
-
-      {open && <div className="overlay" onClick={() => setOpen(false)} />}
-      <aside className={`drawer ${open ? 'open' : ''}`} aria-hidden={!open}>
-        <div className="drawer-head">
-          <h2>Giỏ hàng ({cart.count})</h2>
-          <button className="ghost" onClick={() => setOpen(false)} aria-label="Đóng">✕</button>
-        </div>
-
-        <div className="drawer-body">
-          {cart.items.length === 0 && <p className="empty">Giỏ hàng trống</p>}
-          {cart.items.map(({ product: p, qty }) => (
-            <div className="line" key={p.id}>
-              <img src={p.image} alt="" />
-              <div className="line-info">
-                <span className="line-name">{p.name}</span>
-                <span className="line-price">{vnd(p.price)}</span>
-                <div className="qty">
-                  <button onClick={() => run(api.setQty(p.id, qty - 1))}>−</button>
-                  <span>{qty}</span>
-                  <button onClick={() => run(api.setQty(p.id, qty + 1))}>+</button>
-                </div>
-              </div>
-              <button className="ghost" onClick={() => run(api.setQty(p.id, 0))} aria-label="Xóa">🗑</button>
-            </div>
-          ))}
-        </div>
-
-        <div className="drawer-foot">
-          <div className="total">
-            <span>Tổng cộng</span>
-            <strong>{vnd(cart.total)}</strong>
-          </div>
-          <button className="primary" disabled={!cart.count} onClick={() => alert('Demo: chưa có thanh toán 🙂')}>
-            Thanh toán
-          </button>
-          <button className="ghost" disabled={!cart.count} onClick={() => run(api.clear())}>
-            Xóa giỏ hàng
-          </button>
-        </div>
-      </aside>
-    </>
+              <Route path="admin" element={<AdminLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="orders" element={<Orders />} />
+                <Route path="orders/:code" element={<OrderDetail />} />
+                <Route path="orders/:code/print" element={<OrderPrint />} />
+                <Route path="calendar" element={<Calendar />} />
+                <Route path="products" element={<Products />} />
+                <Route path="products/:id" element={<ProductForm />} />
+                <Route path="media" element={<MediaLibrary />} />
+                <Route path="users" element={<Users />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
+            </Routes>
+          </CatalogProvider>
+        </CartProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

@@ -1,0 +1,111 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Bảng màu Speed Showroom, đặt tên theo biến của shadcn/ui */
+:root {
+  --radius: 0.75rem;
+  --background: #ffffff;
+  --foreground: #111113;
+  --card: #ffffff;
+  --card-foreground: #111113;
+  --popover: #ffffff;
+  --popover-foreground: #111113;
+  --primary: #0e0e12;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f6;
+  --secondary-foreground: #111113;
+  --muted: #f4f4f6;
+  --muted-foreground: #6b6b73;
+  --accent: #f4f4f6;
+  --accent-foreground: #111113;
+  --destructive: #e5322d;
+  --border: #e6e6e9;
+  --input: #e6e6e9;
+  --ring: #0e0e12;
+  --brand: #e5322d;
+  --brand-foreground: #ffffff;
+  --brand-2: #ff6a3d;
+  --success: #16a34a;
+}
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-2: var(--brand-2);
+  --color-success: var(--success);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  /* Tailwind 4 đặt con trỏ mặc định cho nút; trả lại con trỏ tay cho phần tử bấm được */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='combobox'],
+  [role='radio'],
+  [role='option'],
+  summary {
+    cursor: pointer;
+  }
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-background font-sans text-sm text-foreground overflow-x-hidden;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+/* Chữ "đang suy nghĩ" của Speedy: vệt sáng chạy ngang qua chữ */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.shimmer-text {
+  color: transparent;
+  background-image: linear-gradient(100deg, color-mix(in srgb, var(--muted-foreground) 70%, white) 35%, var(--foreground) 50%, color-mix(in srgb, var(--muted-foreground) 70%, white) 65%);
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: shimmer 1.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+    color: var(--muted-foreground);
+    background-image: none;
+  }
+}
