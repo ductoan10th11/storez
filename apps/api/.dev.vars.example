@@ -1,0 +1,12 @@
+# Sao chép thành .dev.vars (đã gitignore) và điền giá trị từ Cloudinary Console > Settings > API Keys.
+# Dùng cho wrangler dev; lên Cloudflare thật thì đẩy bằng: npx wrangler secret bulk .dev.vars
+CLOUD_NAME=
+CLOUD_API_KEY=
+CLOUD_API_SECRET=
+
+# Trợ lý Speedy: endpoint tương thích OpenAI (chat/completions, rerank, embeddings)
+AI_BASE_URL=
+AI_API_KEY=
+AI_LLM_MODEL=
+AI_EMBEDDING_MODEL=
+AI_RERANKER_MODEL=

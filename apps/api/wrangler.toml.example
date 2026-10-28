@@ -1,0 +1,28 @@
+name = "store"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Worker phục vụ luôn frontend (build từ apps/web); chỉ /api/* chạy qua Worker trước
+[assets]
+directory = "../web/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# Tạo thật khi deploy:
+#   npx wrangler d1 create store-db        -> điền database_id
+#   npx wrangler kv namespace create CART  -> điền id
+#   Ảnh tải lên lưu ở Cloudinary: đặt CLOUD_NAME, CLOUD_API_KEY, CLOUD_API_SECRET bằng
+#   `wrangler secret bulk .dev.vars` (xem docs/README.md mục 5); chạy local đọc từ apps/api/.dev.vars
+[[d1_databases]]
+binding = "DB"
+database_name = "store-db"
+database_id = "d7d6e6dd-5bfa-4e71-a6bd-dd6bb85c7255"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "CART"
+id = "40add3e30708404f8e8dcde8fc0c5d28"
+
+# Hằng giờ, phút 0: hết hạn đơn, dọn phiên, dọn ảnh mồ côi
+[triggers]
+crons = ["0 * * * *"]

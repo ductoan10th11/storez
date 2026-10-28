@@ -1,92 +1,52 @@
 import { Hono } from 'hono'
-import type { Context } from 'hono'
+import { secureHeaders } from 'hono/secure-headers'
+import type { AppEnv, Bindings } from './env'
+import { errorBody, notFound, onError, requireJson } from './middleware/errors'
+import { session } from './middleware/session'
+import account from './routes/account'
+import admin from './routes/admin'
+import assistant from './routes/assistant'
+import auth from './routes/auth'
+import cart from './routes/cart'
+import catalog from './routes/catalog'
+import orders from './routes/orders'
+import track from './routes/track'
+import { cleanExpiredSessions } from './services/auth'
+import { cleanOrphanMedia } from './services/media'
+import { expireOrders } from './services/orders'
 
-type Env = { Bindings: { DB: D1Database; CART: KVNamespace } }
-type Line = { productId: number; qty: number }
-type Product = { id: number; name: string; description: string; price: number; image: string }
+const api = new Hono<AppEnv>()
+api.use('*', session)
+api.use('*', requireJson)
+api.route('/', catalog)
+api.route('/cart', cart)
+api.route('/auth', auth)
+api.route('/orders', orders)
+api.route('/track', track)
+api.route('/account', account)
+api.route('/assistant', assistant)
+api.route('/admin', admin)
+api.all('*', (c) => c.json(errorBody('not_found', 'Không tìm thấy'), 404))
 
-const app = new Hono<Env>().basePath('/api')
+export const app = new Hono<AppEnv>()
+app.use('*', secureHeaders())
+app.onError(onError)
+app.notFound(notFound)
+app.route('/api', api)
 
-const CART_TTL = 60 * 60 * 24 * 30 // 30 ngày
-
-// Giỏ hàng gắn với cart id do client sinh (lưu ở localStorage)
-const cartKey = (c: Context<Env>) => {
-  const id = c.req.header('x-cart-id')
-  return id && /^[\w-]{8,64}$/.test(id) ? `cart:${id}` : null
+// Việc định kỳ (mỗi giờ). Mỗi việc idempotent và có giới hạn số dòng.
+export async function runScheduled(env: Bindings) {
+  const [expired, sessions, mediaRemoved] = await Promise.all([
+    expireOrders(env.DB),
+    cleanExpiredSessions(env.DB),
+    cleanOrphanMedia(env),
+  ])
+  console.log('scheduled', JSON.stringify({ expired, sessions, mediaRemoved }))
 }
 
-const readLines = async (c: Context<Env>, key: string) =>
-  (await c.env.CART.get<Line[]>(key, 'json')) ?? []
-
-const writeLines = (c: Context<Env>, key: string, lines: Line[]) =>
-  c.env.CART.put(key, JSON.stringify(lines), { expirationTtl: CART_TTL })
-
-// Ghép dòng giỏ hàng với thông tin sản phẩm từ D1
-const hydrate = async (c: Context<Env>, lines: Line[]) => {
-  if (!lines.length) return { items: [], total: 0, count: 0 }
-  const marks = lines.map(() => '?').join(',')
-  const { results } = await c.env.DB.prepare(`SELECT * FROM products WHERE id IN (${marks})`)
-    .bind(...lines.map((l) => l.productId))
-    .all<Product>()
-  const byId = new Map(results.map((p) => [p.id, p]))
-  const items = lines.flatMap((l) => {
-    const product = byId.get(l.productId)
-    return product ? [{ product, qty: l.qty }] : []
-  })
-  return {
-    items,
-    total: items.reduce((s, i) => s + i.product.price * i.qty, 0),
-    count: items.reduce((s, i) => s + i.qty, 0),
-  }
-}
-
-app.get('/products', async (c) => {
-  const { results } = await c.env.DB.prepare('SELECT * FROM products ORDER BY id').all<Product>()
-  return c.json(results)
-})
-
-app.get('/cart', async (c) => {
-  const key = cartKey(c)
-  if (!key) return c.json({ error: 'missing x-cart-id' }, 400)
-  return c.json(await hydrate(c, await readLines(c, key)))
-})
-
-// Thêm 1 sản phẩm vào giỏ
-app.post('/cart/items', async (c) => {
-  const key = cartKey(c)
-  if (!key) return c.json({ error: 'missing x-cart-id' }, 400)
-  const { productId } = await c.req.json<{ productId: number }>()
-  const exists = await c.env.DB.prepare('SELECT 1 FROM products WHERE id = ?').bind(productId).first()
-  if (!exists) return c.json({ error: 'product not found' }, 404)
-
-  const lines = await readLines(c, key)
-  const line = lines.find((l) => l.productId === productId)
-  if (line) line.qty += 1
-  else lines.push({ productId, qty: 1 })
-  await writeLines(c, key, lines)
-  return c.json(await hydrate(c, lines))
-})
-
-// Đặt số lượng (qty <= 0 thì xóa khỏi giỏ)
-app.put('/cart/items/:id', async (c) => {
-  const key = cartKey(c)
-  if (!key) return c.json({ error: 'missing x-cart-id' }, 400)
-  const productId = Number(c.req.param('id'))
-  const { qty } = await c.req.json<{ qty: number }>()
-
-  let lines = await readLines(c, key)
-  lines = qty > 0
-    ? lines.map((l) => (l.productId === productId ? { ...l, qty: Math.min(qty, 99) } : l))
-    : lines.filter((l) => l.productId !== productId)
-  await writeLines(c, key, lines)
-  return c.json(await hydrate(c, lines))
-})
-
-app.delete('/cart', async (c) => {
-  const key = cartKey(c)
-  if (!key) return c.json({ error: 'missing x-cart-id' }, 400)
-  await c.env.CART.delete(key)
-  return c.json({ items: [], total: 0, count: 0 })
-})
-
-export default app
+export default {
+  fetch: app.fetch,
+  scheduled: (_event: ScheduledController, env: Bindings, ctx: ExecutionContext) => {
+    ctx.waitUntil(runScheduled(env))
+  },
+} satisfies ExportedHandler<Bindings>
